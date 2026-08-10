@@ -1,0 +1,17 @@
+{
+  "name": "credential-lens",
+  "version": "0.1.0",
+  "description": "Safe, evidence-based credential inspection",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "credential-lens": "bin/credential-lens.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT"
+}
