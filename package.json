@@ -1,9 +1,15 @@
 {
-  "name": "credential-lens",
+  "name": "@nikolareljin/credential-lens",
   "version": "0.1.0",
   "description": "Safe, evidence-based credential inspection",
   "type": "module",
   "main": "src/index.js",
+  "files": ["bin", "src", "docs", "README.md", "LICENSE"],
+  "keywords": ["security", "credentials", "ssh", "jwt", "certificate", "secret-scanning"],
+  "repository": { "type": "git", "url": "git+https://github.com/nikolareljin/credential-lens.git" },
+  "bugs": { "url": "https://github.com/nikolareljin/credential-lens/issues" },
+  "homepage": "https://github.com/nikolareljin/credential-lens#readme",
+  "publishConfig": { "access": "public" },
   "bin": {
     "credential-lens": "bin/credential-lens.js"
   },

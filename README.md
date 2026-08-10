@@ -2,6 +2,34 @@
 
 `credential-lens` safely inspects SSH key files and compact JWTs and produces evidence-based facts for security-review tooling.
 
+## Install
+
+After npm publication, install it globally to use the CLI:
+
+```sh
+npm install --global @nikolareljin/credential-lens
+credential-lens inspect --file /protected/path/to/artifact --format json
+```
+
+Or add it to another Node.js tool:
+
+```sh
+npm install @nikolareljin/credential-lens
+```
+
+```js
+import { inspectFile } from '@nikolareljin/credential-lens';
+
+const result = await inspectFile('/protected/path/to/artifact');
+```
+
+For local development before publication, install from a checkout:
+
+```sh
+npm install /path/to/credential-lens
+```
+
+
 ```sh
 credential-lens inspect --file /path/to/id_ed25519 --format json
 credential-lens inspect --file /path/to/encrypted-key --unlock --format json
@@ -26,7 +54,7 @@ Tests use only synthetic, non-usable parser fixtures. Do not add real SSH keys, 
 ## Library
 
 ```js
-import { inspectFile } from 'credential-lens';
+import { inspectFile } from '@nikolareljin/credential-lens';
 
 const report = await inspectFile('/protected/path/to/key');
 ```
