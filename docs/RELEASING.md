@@ -11,11 +11,11 @@ git submodule update --init --recursive
 
 ## npm publication
 
-The public package name is `@nikolareljin/credential-lens`. Authenticate to the personal npm account that owns the `@nikolareljin` scope, then publish only from a reviewed release branch after its version is merged and tagged:
+The public package name is `@nikolareljin/credential-lens`. For a local manual publish, authenticate to the personal npm account that owns the `@nikolareljin` scope, then publish only from a reviewed, tagged release:
 
 ```sh
 npm login
 npm publish --access public
 ```
 
-The repository includes a manual publish workflow for a specific existing tag. Configure `NPM_TOKEN` as a repository Actions secret before using it. The workflow verifies the package version against the tag, runs checks, and publishes with provenance. Never put a token in the repository or command arguments.
+The repository includes a manual publish workflow for a specific existing tag. Configure npm trusted publishing for the exact GitHub repository, `publish.yml` workflow filename, and `npm` environment. The workflow uses GitHub Actions OIDC and does not require an npm token. It verifies the package version against the tag, runs checks, and publishes with automatic provenance.
