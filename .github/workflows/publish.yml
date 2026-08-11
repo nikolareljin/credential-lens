@@ -30,5 +30,16 @@ jobs:
           set -euo pipefail
           actual_version="$(node -p "require('./package.json').version")"
           test "$actual_version" = "$EXPECTED_VERSION"
-      - run: ./scripts/check.sh
-      - run: npm publish --access public
+      - name: Validate package
+        run: |
+          set -euo pipefail
+          node --check bin/credential-lens.js
+          node --check src/index.js
+          node --check src/inspect-file.js
+          node --check src/inspection-session.js
+          npm test
+          npm pack --dry-run
+      - name: Publish package
+        env:
+          NODE_AUTH_TOKEN: ""
+        run: npm publish --access public
