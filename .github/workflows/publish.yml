@@ -40,6 +40,8 @@ jobs:
           npm test
           npm pack --dry-run
       - name: Publish package
-        env:
-          NODE_AUTH_TOKEN: ""
-        run: npm publish --access public
+        run: |
+          set -euo pipefail
+          unset NODE_AUTH_TOKEN
+          npm config delete //registry.npmjs.org/:_authToken || true
+          npm publish --access public
