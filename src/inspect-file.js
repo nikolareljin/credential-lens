@@ -5,6 +5,7 @@ import { constants, promises as fs } from 'node:fs';
 
 const SSH_KEY_TOKEN = /^(?:ssh-|ecdsa-|sk-)[A-Za-z0-9@._+-]+$/;
 const CERT_TOKEN = /-cert-v01@openssh\.com$/;
+const MAX_INPUT_BYTES = 1024 * 1024;
 
 function readUInt32(buffer, offset) {
   if (offset + 4 > buffer.length) throw new Error('Truncated SSH binary data');
@@ -270,7 +271,7 @@ function analyzeCertificateArtifact(sourcePath, text) {
 
 
 async function inspectData(data, { passphrase, sourcePath = null } = {}) {
-  if (data.length > 1024 * 1024) throw new Error('Refusing to inspect a file larger than 1 MiB');
+  if (data.length > MAX_INPUT_BYTES) throw new Error('Refusing to inspect a file larger than 1 MiB');
   const text = data.toString('utf8');
   const report = {
     schemaVersion: 1,
@@ -331,6 +332,7 @@ export async function inspectFile(path, options = {}) {
   try {
     const stat = await handle.stat();
     if (!stat.isFile()) throw new Error("The supplied path is not a regular file");
+    if (stat.size > MAX_INPUT_BYTES) throw new Error('Refusing to inspect a file larger than 1 MiB');
     const data = await handle.readFile();
     const result = await inspectData(data, { ...options, sourcePath: path });
     if (options.includeSource === true) result.input.source = { kind: "file", path };

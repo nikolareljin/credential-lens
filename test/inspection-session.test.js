@@ -47,3 +47,20 @@ test('file and byte inspection agree without returning a source path by default'
     assert.equal(Object.hasOwn(fromFile.input, 'source'), false);
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
+
+test('does not retain an in-flight result after disposal', async () => {
+  const session = createInspectionSession();
+  const pending = session.inspectBytes(fakeJwt());
+  session.dispose();
+  await pending;
+  assert.equal(session.cacheStats().entries, 0);
+});
+
+test('rejects an oversized file before inspection', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'credential-lens-'));
+  try {
+    const path = join(directory, 'oversized-synthetic-input');
+    await writeFile(path, Buffer.alloc(1024 * 1024 + 1, 0x58));
+    await assert.rejects(() => inspectFile(path), /larger than 1 MiB/);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});

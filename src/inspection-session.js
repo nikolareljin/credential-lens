@@ -41,7 +41,7 @@ export function createInspectionSession({ maxEntries = 1_000, maxResultBytes = 4
     stats.misses += 1;
     const pending = inspectBytes(data, options).then((result) => {
       const safe = { ...result, cache: { key: descriptor.key, algorithm: 'hmac-sha256', analysisMode: descriptor.mode, scope: 'session', hit: false } };
-      cache(descriptor.key, safe);
+      if (!disposed) cache(descriptor.key, safe);
       return safe;
     }).finally(() => inFlight.delete(descriptor.key));
     inFlight.set(descriptor.key, pending);
