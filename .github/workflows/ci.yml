@@ -1,0 +1,17 @@
+name: CI
+on:
+  push:
+    branches: [main, 'release/**']
+  pull_request:
+    branches: [main, 'release/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    uses: nikolareljin/ci-helpers/.github/workflows/node.yml@production
+    with:
+      node_version: '22'
+      lint_command: node --check bin/credential-lens.js && node --check src/index.js && node --check src/inspect-file.js && node --check src/inspection-session.js
+      test_command: npm test
+      build_command: npm pack --dry-run

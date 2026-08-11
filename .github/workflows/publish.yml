@@ -1,0 +1,30 @@
+name: Publish npm package
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing version tag, for example 0.3.0
+        required: true
+        type: string
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.release_tag }}
+          submodules: recursive
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          registry-url: https://registry.npmjs.org
+      - name: Verify release version
+        run: test "$(node -p \"require('./package.json').version\")" = "${{ inputs.release_tag }}"
+      - run: ./scripts/check.sh
+      - run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

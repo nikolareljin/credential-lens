@@ -2,6 +2,11 @@
 
 `credential-lens` safely inspects SSH key files and compact JWTs and produces evidence-based facts for security-review tooling.
 
+## Author
+
+[Nik Reljin](https://github.com/nikolareljin) · [LinkedIn](https://www.linkedin.com/in/nikolareljin)
+
+
 ## Install
 
 After npm publication, install it globally to use the CLI:
@@ -10,6 +15,16 @@ After npm publication, install it globally to use the CLI:
 npm install --global @nikolareljin/credential-lens
 credential-lens inspect --file /protected/path/to/artifact --format json
 ```
+
+## Run with npx
+
+Run the published CLI without installing it globally:
+
+```sh
+npx --yes @nikolareljin/credential-lens inspect --file /protected/path/to/artifact --format json
+```
+
+Use the same file-only form for each credential; do not place credential values in shell arguments.
 
 Or add it to another Node.js tool:
 
@@ -50,6 +65,7 @@ Tests use only synthetic, non-usable parser fixtures. Do not add real SSH keys, 
 
 - [Usage](docs/USAGE.md)
 - [Integration contract and caching](docs/INTEGRATION.md)
+- [Development and npm releases](docs/RELEASING.md)
 
 ## Library
 

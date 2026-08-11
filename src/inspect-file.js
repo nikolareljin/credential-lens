@@ -1,10 +1,11 @@
 import { createHash, createPrivateKey, createPublicKey } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { analyzeAdditionalStaticFormats } from './static-formats.js';
-import { promises as fs } from 'node:fs';
+import { constants, promises as fs } from 'node:fs';
 
 const SSH_KEY_TOKEN = /^(?:ssh-|ecdsa-|sk-)[A-Za-z0-9@._+-]+$/;
 const CERT_TOKEN = /-cert-v01@openssh\.com$/;
+const MAX_INPUT_BYTES = 1024 * 1024;
 
 function readUInt32(buffer, offset) {
   if (offset + 4 > buffer.length) throw new Error('Truncated SSH binary data');
@@ -138,10 +139,9 @@ function caveats(hasCertificate) {
 }
 
 
-function inspectCertificate(path) {
+function inspectCertificate(sourcePath) {
   try {
-    const additional = analyzeCertificateArtifact(path, text) || analyzeAdditionalStaticFormats(text);
-    const output = execFileSync('ssh-keygen', ['-L', '-f', path], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    const output = execFileSync('ssh-keygen', ['-L', '-f', sourcePath], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
     const lines = output.split(String.fromCharCode(10));
     const field = (label) => { const line = lines.find((value) => value.trimStart().startsWith(label)); return line ? line.trimStart().slice(label.length).trim() : null; };
     const principals = [];
@@ -205,8 +205,8 @@ function certificateValidityTimes(validity) {
 
 function addIntegrationContract(report, data, analysisMode) {
   const facts = report.facts;
-  const digest = createHash('sha256').update(data).digest('hex');
-  report.cache = { algorithm: 'sha256', contentDigest: digest, analysisMode, key: 'credential-lens:v1:' + analysisMode + ':sha256:' + digest };
+
+  report.cache = { algorithm: null, key: null, analysisMode, scope: 'none', hit: false };
   report.credential = { family: facts.family || (facts.kind === 'jwt' ? 'jwt' : 'ssh'), kind: facts.kind, format: facts.container };
   report.summary = { algorithm: null, fingerprint: null, encrypted: facts.encryption?.encrypted ?? null, issuer: null, subject: null, issuedAt: null, notBefore: null, expiresAt: null };
   report.claims = [];
@@ -253,37 +253,36 @@ function addIntegrationContract(report, data, analysisMode) {
  * `passphrase` is retained only for the duration of this call. It is intended
  * for an interactive caller; the CLI deliberately never accepts a passphrase.
  */
-function analyzeCertificateArtifact(path, text) {
+function analyzeCertificateArtifact(sourcePath, text) {
   const fields = (output) => Object.fromEntries(output.split(String.fromCharCode(10)).map((line) => { const index = line.indexOf('='); return index > 0 ? [line.slice(0, index).trim(), line.slice(index + 1).trim()] : []; }).filter((entry) => entry.length));
   try {
     if (/-----BEGIN CERTIFICATE-----/.test(text)) {
-      const data = fields(execFileSync('openssl', ['x509', '-in', path, '-noout', '-subject', '-issuer', '-serial', '-dates', '-fingerprint', '-sha256'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }));
+      const data = fields(execFileSync('openssl', ['x509', '-in', sourcePath, '-noout', '-subject', '-issuer', '-serial', '-dates', '-fingerprint', '-sha256'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }));
       return { family: 'x509', kind: 'certificate', container: 'pem', summary: { issuer: data.issuer || null, subject: data.subject || null, notBefore: data.notBefore || null, expiresAt: data.notAfter || null, fingerprint: data['sha256 Fingerprint'] || null }, claims: Object.entries(data).map(([name, value]) => claim('x509.' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), name, ['subject', 'issuer'].includes(name) ? 'identity' : 'cryptographic', value)), caveats: ['Certificate facts were read locally. Chain trust and revocation were not checked.'] };
     }
     if (/-----BEGIN (CERTIFICATE REQUEST|NEW CERTIFICATE REQUEST)-----/.test(text)) {
-      const data = fields(execFileSync('openssl', ['req', '-in', path, '-noout', '-subject'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }));
+      const data = fields(execFileSync('openssl', ['req', '-in', sourcePath, '-noout', '-subject'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }));
       return { family: 'x509', kind: 'certificate-signing-request', container: 'pem', summary: { subject: data.subject || null }, claims: Object.entries(data).map(([name, value]) => claim('csr.' + name, name, 'identity', value)), caveats: ['A CSR is a request, not an issued certificate; it has no issuer or expiry date.'] };
     }
-    if (/.(p12|pfx)$/i.test(path)) return { family: 'x509', kind: 'pkcs12', container: 'pkcs12', summary: { encrypted: true }, claims: [claim('pkcs12.unlock-required', 'Unlock required', 'protection', true)], caveats: ['PKCS#12 contents are encrypted or password-protected and require an explicit interactive unlock flow.'] };
+    if (sourcePath && /\.(p12|pfx)$/i.test(sourcePath)) return { family: 'x509', kind: 'pkcs12', container: 'pkcs12', summary: { encrypted: true }, claims: [claim('pkcs12.unlock-required', 'Unlock required', 'protection', true)], caveats: ['PKCS#12 contents are encrypted or password-protected and require an explicit interactive unlock flow.'] };
   } catch { return null; }
   return null;
 }
 
 
-export async function inspectFile(path, { passphrase } = {}) {
-  const data = await fs.readFile(path);
-  if (data.length > 1024 * 1024) throw new Error('Refusing to inspect a file larger than 1 MiB');
+async function inspectData(data, { passphrase, sourcePath = null } = {}) {
+  if (data.length > MAX_INPUT_BYTES) throw new Error('Refusing to inspect a file larger than 1 MiB');
   const text = data.toString('utf8');
   const report = {
     schemaVersion: 1,
-    input: { path, bytes: data.length },
+    input: { bytes: data.length },
     status: 'ok',
     facts: {},
     evidence: { identity: [] },
     caveats: []
   };
   try {
-    const additional = analyzeCertificateArtifact(path, text) || analyzeAdditionalStaticFormats(text);
+    const additional = analyzeCertificateArtifact(sourcePath, text) || analyzeAdditionalStaticFormats(text);
     if (additional) {
       report.facts = additional;
     } else if (text.trim().split('.').length === 3) {
@@ -301,7 +300,7 @@ export async function inspectFile(path, { passphrase } = {}) {
       report.facts = { kind: CERT_TOKEN.test(parsed.publicKeys[0].algorithm) ? 'certificate' : 'public-key', container: 'openssh', ...parsed };
     }
     if (report.facts.kind === 'certificate') {
-      report.facts.certificate = inspectCertificate(path);
+      report.facts.certificate = sourcePath ? inspectCertificate(sourcePath) : null;
       for (const principal of report.facts.certificate?.principals || []) report.evidence.identity.push({ value: principal, source: 'certificate principal', confidence: 'embedded-certificate-claim' });
       if (report.facts.certificate?.keyId) report.evidence.identity.push({ value: report.facts.certificate.keyId, source: 'certificate key ID', confidence: 'embedded-certificate-claim' });
     }
@@ -311,14 +310,34 @@ export async function inspectFile(path, { passphrase } = {}) {
     addIntegrationContract(report, data, passphrase === undefined ? 'metadata' : 'unlocked');
     return report;
   } catch (error) {
-    const digest = createHash("sha256").update(data).digest("hex");
     report.status = "uninspectable";
     report.error = { code: "UNSUPPORTED_OR_MALFORMED_CREDENTIAL", message: error.message };
-    report.cache = { algorithm: "sha256", contentDigest: digest, analysisMode: "metadata", key: "credential-lens:v1:metadata:sha256:" + digest };
+    report.cache = { algorithm: null, key: null, analysisMode: passphrase === undefined ? "metadata" : "unlocked", scope: "none", hit: false };
     report.credential = null;
     report.summary = null;
     report.claims = [];
     report.warnings = [];
     return report;
+  }
+}
+export async function inspectBytes(bytes, options = {}) {
+  if (!Buffer.isBuffer(bytes) && !(bytes instanceof Uint8Array)) throw new TypeError("bytes must be a Buffer or Uint8Array");
+  const data = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  return inspectData(data, options);
+}
+
+export async function inspectFile(path, options = {}) {
+  const flags = constants.O_RDONLY | (constants.O_NOFOLLOW || 0);
+  const handle = await fs.open(path, flags);
+  try {
+    const stat = await handle.stat();
+    if (!stat.isFile()) throw new Error("The supplied path is not a regular file");
+    if (stat.size > MAX_INPUT_BYTES) throw new Error('Refusing to inspect a file larger than 1 MiB');
+    const data = await handle.readFile();
+    const result = await inspectData(data, { ...options, sourcePath: path });
+    if (options.includeSource === true) result.input.source = { kind: "file", path };
+    return result;
+  } finally {
+    await handle.close();
   }
 }

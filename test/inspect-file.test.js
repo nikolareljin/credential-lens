@@ -91,7 +91,8 @@ test('decodes a fully synthetic JWT without emitting the raw bearer token', asyn
     assert.equal(report.facts.payload.sub, 'synthetic-user');
     assert.equal(report.facts.timestamps.exp, '2023-11-14T23:13:20.000Z');
     assert.equal(report.facts.signature.present, true);
-    assert.match(report.cache.key, /^credential-lens:v1:metadata:sha256:[a-f0-9]{64}$/);
+    assert.equal(report.cache.scope, 'none');
+    assert.equal(report.cache.key, null);
     assert.equal(report.credential.family, 'jwt');
     assert.equal(report.summary.subject, 'synthetic-user');
     assert.equal(report.summary.expiresAt, '2023-11-14T23:13:20.000Z');

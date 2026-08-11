@@ -1,24 +1,31 @@
 # Integration contract
 
-Every result includes this stable display model:
+Every result includes a stable display model:
 
-- `credential`: `{ family, kind, format }` or `null` when uninspectable.
-- `summary`: stable columns: `algorithm`, `fingerprint`, `encrypted`, `issuer`, `subject`, `issuedAt`, `notBefore`, and `expiresAt`.
+- `credential`: `{ family, kind, format }`, or `null` when uninspectable.
+- `summary`: `algorithm`, `fingerprint`, `encrypted`, `issuer`, `subject`, `issuedAt`, `notBefore`, and `expiresAt`.
 - `claims`: table rows with `id`, `label`, `category`, `value`, `source`, and `verification`.
-- `warnings`: limitations that a UI should show.
-- `cache`: a content-addressed result key.
+- `warnings`: limitations a caller should display.
+- `cache`: cache metadata; it never contains a raw credential or stable content digest.
 
-The `summary` identity and lifecycle fields are `null` when the credential does not embed those facts. They are never inferred. A JWT issuer/subject or SSH comment/principal is an embedded, unverified claim; an ordinary SSH key has no owner or expiration date.
+Identity and lifecycle fields are `null` unless the supplied artifact embeds them. SSH comments, certificate principals, and JWT claims are evidence, not verified ownership.
 
-## Cache and temporary files
+## Recommended scanner integration
 
-`cache.key` has the form `credential-lens:v1:<analysis-mode>:sha256:<digest>`. The digest is calculated from the exact supplied bytes, so it remains stable when a caller creates a different temporary filename for the same credential.
+Use one `createInspectionSession()` per scanner run and pass candidate bytes directly. This avoids one temporary file per finding and deduplicates repeated findings in memory.
 
-For a filename-only integration:
+```js
+import { createInspectionSession } from '@nikolareljin/credential-lens';
 
-1. Hash the detected bytes in memory and check the caller's result cache by the expected key.
-2. On a cache hit, render the stored normalized result without creating a file or invoking this tool.
-3. On a miss, write a single restrictive temporary file (`0600`), inspect it, store the normalized result by `cache.key`, and delete the file in `finally`.
-4. Bound this workflow with a worker pool. The maximum temporary-file count is the worker count, not the number of findings.
+const session = createInspectionSession({ maxEntries: 1_000, maxResultBytes: 4 * 1024 * 1024 });
+try {
+  const report = await session.inspectBytes(candidateBytes);
+  // `report.cache.hit` is true when this session already inspected these bytes.
+} finally {
+  session.dispose();
+}
+```
 
-Cache normalized results only. Never cache raw credentials, passphrases, private-key bodies, or compact JWT values. Treat the content digest as sensitive correlation metadata and expire it with the caller's scan lifecycle.
+The cache key is an HMAC-SHA-256 value derived from a random secret created for that session. It is scoped to both the exact bytes and analysis mode (`metadata` or `unlocked`), cannot be reused across sessions, and is safe for in-process lookup only. The cache stores normalized reports, never input bytes, passphrases, decrypted key material, paths, or raw tokens. It is bounded by entry count and result size; disposal clears entries and zeroes its secret.
+
+For tools that can only invoke the CLI, use a restrictive temporary file and delete it in `finally`, bounded by a worker pool. Prefer the library API when it is available.
