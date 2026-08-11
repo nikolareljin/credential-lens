@@ -1,7 +1,8 @@
 {
   "name": "@nikolareljin/credential-lens",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Safe, evidence-based credential inspection",
+  "author": "Nik Reljin (https://github.com/nikolareljin)",
   "type": "module",
   "main": "src/index.js",
   "files": ["bin", "src", "docs", "README.md", "LICENSE"],

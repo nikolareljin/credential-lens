@@ -9,6 +9,17 @@
 npm install --global @nikolareljin/credential-lens
 ```
 
+## Run with npx
+
+After publication, run the CLI without a global install:
+
+```sh
+npx --yes @nikolareljin/credential-lens inspect --file /protected/path/to/artifact --format json
+npx --yes @nikolareljin/credential-lens inspect --file /protected/path/to/token.jwt --format json
+```
+
+`npx` downloads the package to npm's cache but receives only the supplied file path. The credential value is never passed as an argument.
+
 For a Node.js integration:
 
 
@@ -31,9 +42,17 @@ Supported input: OpenSSH/PEM private keys, OpenSSH public keys and certificates,
 ## Library
 
 ```js
-import { inspectFile } from '@nikolareljin/credential-lens';
+import { createInspectionSession, inspectFile } from '@nikolareljin/credential-lens';
 
 const result = await inspectFile('/protected/path/to/artifact');
+
+// For high-volume scanners, prefer an in-memory, session-only cache.
+const session = createInspectionSession();
+try {
+  const report = await session.inspectBytes(candidateBytes);
+} finally {
+  session.dispose();
+}
 ```
 
 Do not log the supplied credential content. Results omit private-key bodies, raw compact JWTs, and JWT signatures.
