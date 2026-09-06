@@ -76,3 +76,10 @@ const report = await inspectFile('/protected/path/to/key');
 ```
 
 For PEM keys, an interactive host application may pass a short-lived in-memory `passphrase` option to inspect public facts that require unlocking. The command-line tool deliberately does not accept passphrases.
+
+
+## Clone traffic
+
+![Clone traffic](https://raw.githubusercontent.com/nikolareljin/stats/main/charts/credential-lens.svg)
+
+_Updated daily. Total and unique cloners over the last 14 days._
